@@ -1,5 +1,5 @@
 [//]: # (![Header]&#40;https://capsule-render.vercel.app/api?section=header&type=waving&text=Github%20Profile&textBg=true&fontAlignY=55&animation=twinkling&fontAlign=35&desc=by%20Ksj&descAlign=75&color=gradient&customColorList=8,18,10,15,23&#41;)
-<img id="banner" alt="banner" src="https://capsule-render.vercel.app/api?section=header&type=waving&text=Github%20Profile&textBg=true&fontAlignY=55&animation=twinkling&fontAlign=35&desc=by%20Ksj&descAlign=75&color=gradient&customColorList=8,18,10,15,23" />
+<img id="banner" alt="banner" src="https://raw.githubusercontent.com/Candy-Tree/Candy-Tree/refs/heads/main/src/header.svg" />
 
 [//]: # (![Typing SVG]&#40;https://readme-typing-svg.demolab.com/?lines=Here+are+my+skills;though+they+may+still+be+lacking&#41;)
 <img id="typing" alt="typing" src="https://readme-typing-svg.demolab.com/?lines=Here+are+my+skills;though+they+may+still+be+lacking" />
