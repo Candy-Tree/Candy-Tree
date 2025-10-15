@@ -13,7 +13,7 @@
     </style>
         <defs>
               <linearGradient id="linear" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stop-color="#9796f0"/><stop offset="100%" stop-color="#fbc7d4"/>
+                <stop offset="0%" stop-color="#c2e59c"/><stop offset="100%" stop-color="#64b3f4"/>
               </linearGradient>
             </defs>
         
@@ -44,8 +44,8 @@
         </path>
       </g>
         
-        <rect fill="#282829" height="110" width ="530" x="35%" y="55%" transform="translate(-265, -55)"  rx ="25" ry ="25" />
-         <text text-anchor="middle" alignment-baseline="middle" x="35%" y="55%" class="text" style="fill:#f7f5f5;" stroke="#none" stroke-width="1" >Github Profile</text>
+        <rect fill="#282829" height="110" width ="530" x="35%" y="50%" transform="translate(-265, -55)"  rx ="25" ry ="25" />
+         <text text-anchor="middle" alignment-baseline="middle" x="35%" y="50%" class="text" style="fill:#f7f5f5;" stroke="#none" stroke-width="1" >Github Profile</text>
         <text text-anchor="middle" alignment-baseline="middle" x="75%" y="60%" class="desc" style="fill:#f7f5f5;">by Ksj</text>
       </svg>
     
