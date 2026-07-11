@@ -1,34 +1,24 @@
-name: Update Streak Stats and Snake Animation
+name: Refresh Terminal Profile Snapshot
 
 on:
   schedule:
-    - cron: "0 0 1,15 * *"
+    - cron: "17 0 * * *"
   workflow_dispatch:
   push:
     branches:
       - main
+
+concurrency:
+  group: terminal-profile-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PROFILE_USER: Candy-Tree
+  CACHE_SECONDS: "21600"
+  STATS_BASE_URL: https://github-readme-stats-8c11-kangseokjoos-projects.vercel.app
+
 jobs:
-  buildSnake:
-    permissions:
-      contents: write
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: Platane/snk/svg-only@v3
-        with:
-          github_user_name: Candy-Tree
-          outputs: |
-            dist/github-snake.svg
-            dist/github-snake-dark.svg?palette=github-dark
-
-      - uses: crazy-max/ghaction-github-pages@v3.1.0
-        with:
-          target_branch: output
-          build_dir: dist
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  updateReadme:
+  updateProfile:
     permissions:
       contents: write
     runs-on: ubuntu-latest
@@ -40,98 +30,86 @@ jobs:
           ref: main
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Create src directory
-        run: | 
-          mkdir -p src
-
-      - name: Save Streak SVG
+      - name: Refresh terminal profile fields
         run: |
-          curl -L "https://streak-stats.demolab.com?user=Candy-Tree&theme=dark&hide_border=true&border_radius=20" \
-            -o src/streak.svg
-          
-          if [ ! -s src/streak.svg ]; then
-            echo "Error: Failed to download streak stats SVG"
+          set -euo pipefail
+
+          STATS_FILE="${RUNNER_TEMP:-/tmp}/profile-stats.svg"
+          PROFILE_FILE="${RUNNER_TEMP:-/tmp}/github-profile.json"
+          CACHE_BUST="${{ github.run_number }}"
+          STATS_URL="${STATS_BASE_URL}/api?username=${PROFILE_USER}&hide=stars,issues&include_all_commits=true&show_icons=true&locale=en&cache_seconds=${CACHE_SECONDS}&v=${CACHE_BUST}"
+          PROFILE_URL="https://api.github.com/users/${PROFILE_USER}"
+
+          curl --fail --location --show-error --silent --retry 3 --retry-delay 5 "$STATS_URL" -o "$STATS_FILE"
+
+          if [ ! -s "$STATS_FILE" ] || grep -Eiq "Something went wrong|Could not resolve|Can't fetch any contribution|Could not find a user|Error lable|Error label" "$STATS_FILE"; then
+            echo "Error: GitHub stats provider returned an invalid SVG"
             exit 1
           fi
-          
-          echo "Successfully downloaded streak stats SVG"
 
-      - name: Save StatCard SVG
+          STATS_DESC="$(sed -nE 's#.*<desc[^>]*>(.*)</desc>.*#\1#p' "$STATS_FILE" | head -n 1)"
+          TOTAL_COMMITS="$(printf '%s\n' "$STATS_DESC" | sed -nE 's/.*Total Commits[[:space:]]*:[[:space:]]*([0-9,]+).*/\1/p')"
+          TOTAL_PRS="$(printf '%s\n' "$STATS_DESC" | sed -nE 's/.*Total PRs[[:space:]]*:[[:space:]]*([0-9,]+).*/\1/p')"
+          CONTRIBUTED_TO="$(printf '%s\n' "$STATS_DESC" | sed -nE 's/.*Contributed to \(last year\)[[:space:]]*:[[:space:]]*([0-9,]+).*/\1/p')"
+
+          for value in "$TOTAL_COMMITS" "$TOTAL_PRS" "$CONTRIBUTED_TO"; do
+            if [[ ! "$value" =~ ^[0-9][0-9,]*$ ]]; then
+              echo "Error: could not parse a GitHub stats value"
+              exit 1
+            fi
+          done
+
+          curl --fail --location --show-error --silent --retry 3 --retry-delay 5 \
+            -H "Accept: application/vnd.github+json" \
+            "$PROFILE_URL" -o "$PROFILE_FILE"
+
+          PUBLIC_REPOS="$(jq -er '.public_repos | select(type == "number" and . >= 0) | floor' "$PROFILE_FILE")"
+          FOLLOWERS="$(jq -er '.followers | select(type == "number" and . >= 0) | floor' "$PROFILE_FILE")"
+          FOLLOWING="$(jq -er '.following | select(type == "number" and . >= 0) | floor' "$PROFILE_FILE")"
+
+          for value in "$PUBLIC_REPOS" "$FOLLOWERS" "$FOLLOWING"; do
+            if [[ ! "$value" =~ ^[0-9]+$ ]]; then
+              echo "Error: could not parse a public GitHub profile value"
+              exit 1
+            fi
+          done
+
+          PROFILE_PUBLIC_REPOS="$PUBLIC_REPOS" \
+          PROFILE_FOLLOWERS="$FOLLOWERS" \
+          PROFILE_FOLLOWING="$FOLLOWING" \
+          PROFILE_TOTAL_COMMITS="$TOTAL_COMMITS" \
+          PROFILE_TOTAL_PRS="$TOTAL_PRS" \
+          PROFILE_CONTRIBUTED_TO="$CONTRIBUTED_TO" \
+          perl -0pi -e '
+            my @fields = (
+              ["public.repos", $ENV{PROFILE_PUBLIC_REPOS}],
+              ["followers", $ENV{PROFILE_FOLLOWERS}],
+              ["following", $ENV{PROFILE_FOLLOWING}],
+              ["total.commits", $ENV{PROFILE_TOTAL_COMMITS}],
+              ["total.pull-reqs", $ENV{PROFILE_TOTAL_PRS}],
+              ["contrib.last-year", $ENV{PROFILE_CONTRIBUTED_TO}],
+            );
+
+            for my $field (@fields) {
+              my ($label, $value) = @{$field};
+              my $updated = s/^(.*?\Q$label\E\s*:\s*).*$/$1$value/m;
+              die "Missing terminal profile field: $label\n" unless $updated;
+            }
+          ' README.md
+
+      - name: Commit refreshed terminal fields
         run: |
-          curl -L "https://github-readme-stats-8c11-kangseokjoos-projects.vercel.app/api?username=Candy-Tree&hide=stars,issues&include_all_commits=true&show_icons=true&locale=en&border_radius=20&theme=dracula#gh-dark-mode-only" \
-            -o src/statCard.svg
-          
-          if [ ! -s src/statCard.svg ]; then
-            echo "Error: Failed to download stat card SVG"
-            exit 1
-          fi
-          
-          echo "Successfully downloaded stat card SVG"
+          set -euo pipefail
 
-      - name: Save MostUsed SVG
-        run: |
-          curl -L "https://github-readme-stats-8c11-kangseokjoos-projects.vercel.app/api/top-langs/?username=Candy-Tree&layout=compact&include_all_commits=true" \
-            -o src/mostUsed.svg
-          
-          if [ ! -s src/mostUsed.svg ]; then
-            echo "Error: Failed to download mostUsed stats SVG"
-            exit 1
-          fi
-          
-          echo "Successfully downloaded mostUsed stats SVG"
-
-      - name: Save ContributionGraph SVG
-        run: |
-          curl -L "https://github-readme-activity-graph.vercel.app/graph?username=Candy-Tree&theme=xcode&radius=16&area=true" \
-            -o src/contributionGraph.svg
-          
-          if [ ! -s src/contributionGraph.svg ]; then
-            echo "Error: Failed to download contributionGraph SVG"
-            exit 1
-          fi
-          
-          echo "Successfully downloaded contributionGraph SVG"
-
-#      - name: Check for changes
-#        id: check_changes
-#        run: |
-#          if git diff --quiet src/streak.svg; then
-#            echo "No changes detected in streak.svg"
-#            echo "has_changes=false" >> $GITHUB_OUTPUT
-#          else
-#            echo "Changes detected in streak.svg"
-#            echo "has_changes=true" >> $GITHUB_OUTPUT
-#          fi
-
-      - name: Update README.md
-        run: |
-          BRANCH_NAME="refs/heads/output" 
-          SVG_FILE="github-snake-dark.svg" 
-          SVG_LINK="https://raw.githubusercontent.com/${{ github.repository }}/${BRANCH_NAME}/${SVG_FILE}"
-
-          sed -i '$d' README.md
-          echo "![SVG Link]($SVG_LINK)" >> README.md
-          
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          
-          git add *
-          # 이전 커밋 정보 확인
-          LAST_COMMIT_AUTHOR=$(git log -1 --pretty=format:'%an')
-          LAST_COMMIT_MESSAGE=$(git log -1 --pretty=format:'%s')
-          
-          # 이전 커밋이 같은 bot의 자동 업데이트인 경우 amend
-          if [[ "$LAST_COMMIT_AUTHOR" == "github-actions[bot]" ]] && \
-             [[ "$LAST_COMMIT_MESSAGE" == "Update SVGs" || \
-                "$LAST_COMMIT_MESSAGE" == "Update stats and animations" ]]; then
-            echo "Amending previous automatic commit..."
-            git commit --amend -m "Update SVGs" --no-edit
-          else
-            echo "Creating new commit..."
-            git commit -m "Update SVGs"
+
+          git add README.md
+
+          if git diff --cached --quiet; then
+            echo "No terminal profile changes detected"
+            exit 0
           fi
-          
-          git push --force-with-lease
-          
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+          git commit -m "Refresh terminal profile"
+          git push
